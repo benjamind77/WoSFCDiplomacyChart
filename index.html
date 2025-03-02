@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sci-Fi Faction Diplomacy Chart</title>
+    <style>
+        :root {
+            --primary-color: rgb(37, 39, 79);
+            --secondary-color: rgb(23, 24, 48);
+            --text-color: #e0e0e0;
+            --allied-color: #00cc00;
+            --friendly-color: #0066ff;
+            --trade-color: #00cccc;
+            --nonaggression-color: #ffcc00;
+            --tensions-color: #cc33ff;
+            --hostile-color: #ff6600;
+            --war-color: #ff0000;
+            --merged-color: #00ff99;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            border: 1px solid #666;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+
+        .admin-btn {
+            background-color: #990000;
+        }
+
+        .admin-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background-color: var(--primary-color);
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+            transition: right 0.3s ease;
+            z-index: 100;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .admin-panel.open {
+            right: 0;
+        }
+
+        .close-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .auth-form, .admin-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        input, select, textarea {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #666;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-color);
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            margin-left: 10px;
+            border: 1px solid #666;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            position: relative;
+        }
+
+        #standard-view, #map-view {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: opacity 0.3s;
+        }
+
+        #standard-view {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            padding: 2rem;
+            justify-content: flex-start;
+            align-content: flex-start;
+        }
+
+        #map-view {
+            background: url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=2071&auto=format&fit=crop') center/cover;
+            position: relative;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .faction {
+            width: 150px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+        }
+
+        .faction-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--primary-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .faction:hover .faction-logo {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .faction-name {
+            margin-top: 0.5rem;
+            font-weight: bold;
+        }
+
+        .faction-details {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            background-color: var(--primary-color);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            z-index: 5;
+            display: none;
+            text-align: left;
+        }
+
+        .faction.expanded .faction-details {
+            display: block;
+        }
+
+        .relation {
+            display: flex;
+            align-items: center;
+            margin: 0.5rem 0;
+        }
+
+        .relation-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .relation-target {
+            flex: 1;
+        }
+
+        /* Relations colors */
+        .relation-merged .relation-indicator { background-color: var(--merged-color); }
+        .relation-allied .relation-indicator { background-color: var(--allied-color); }
+        .relation-friendly .relation-indicator { background-color: var(--friendly-color); }
+        .relation-trade .relation-indicator { background-color: var(--trade-color); }
+        .relation-nonaggression .relation-indicator { background-color: var(--nonaggression-color); }
+        .relation-tensions .relation-indicator { background-color: var(--tensions-color); }
+        .relation-hostile .relation-indicator { background-color: var(--hostile-color); }
+        .relation-war .relation-indicator { background-color: var(--war-color); }
+
+        /* Map view lines */
+        .relation-line {
+            position: absolute;
+            height: 2px;
+            transform-origin: 0 0;
+            z-index: 1;
+        }
+
+        .faction-map {
+            position: absolute;
+            width: 80px;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .faction-map .faction-logo {
+            width: 60px;
+            height: 60px;
+        }
+
+        .faction-map .faction-name {
+            font-size: 0.8rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        /* Relation Management */
+        .relation-mgmt {
+            margin-top: 1rem;
+            border-top: 1px solid #666;
+            padding-top: 1rem;
+        }
+
+        .relation-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 1rem 0;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 0.5rem;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .admin-panel {
+                width: 100%;
+                right: -100%;
+            }
+            
+            .faction {
+                width: 120px;
+            }
+            
+            .faction-logo {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .faction-details {
+                width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sci-Fi Faction Diplomacy</h1>
+            <div class="view-toggle">
+                <button id="standard-btn" class="btn active">Relations Standard</button>
+                <button id="map-btn" class="btn">Relation Map</button>
+                <button id="admin-btn" class="btn admin-btn">Admin</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div id="standard-view"></div>
+            <div id="map-view"></div>
+        </div>
+
+        <div class="admin-panel">
+            <button class="close-panel">&times;</button>
+            
+            <div id="auth-form" class="auth-form">
+                <h2>Admin Login</h2>
+                <label>
+                    Password:
+                    <input type="password" id="admin-password">
+                </label>
+                <button id="login-btn" class="btn">Login</button>
+            </div>
+            
+            <div id="admin-controls" class="admin-controls" style="display: none;">
+                <h2>Faction Management</h2>
+                
+                <div>
+                    <h3>Add New Faction</h3>
+                    <label>
+                        Faction Name:
+                        <input type="text" id="faction-name">
+                    </label>
+                    
+                    <label>
+                        Logo URL:
+                        <input type="text" id="faction-image">
+                    </label>
+                    
+                    <label>
+                        Text Color (Hex):
+                        <div style="display:flex;align-items:center;">
+                            <input type="text" id="faction-color" placeholder="#FFFFFF">
+                            <div class="color-preview" id="color-preview"></div>
+                        </div>
+                    </label>
+                    
+                    <label>
+                        Font Family:
+                        <select id="faction-font">
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="Verdana, sans-serif">Verdana</option>
+                            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                            <option value="Impact, fantasy">Impact</option>
+                        </select>
+                    </label>
+                    
+                    <label>
+                        Description:
+                        <textarea id="faction-description" rows="4"></textarea>
+                    </label>
+                    
+                    <button id="add-faction-btn" class="btn">Add Faction</button>
+                </div>
+                
+                <div class="relation-mgmt">
+                    <h3>Manage Relations</h3>
+                    
+                    <label>
+                        Select Faction:
+                        <select id="faction-select"></select>
+                    </label>
+                    
+                    <label>
+                        Relation With:
+                        <select id="relation-target"></select>
+                    </label>
+                    
+                    <label>
+                        Relation Type:
+                        <select id="relation-type">
+                            <option value="merged">Merged</option>
+                            <option value="allied">Allied</option>
+                            <option value="friendly">Friendly</option>
+                            <option value="trade">Trade Agreement</option>
+                            <option value="nonaggression">Non-Aggression Pact</option>
+                            <option value="neutral" selected>Neutral</option>
+                            <option value="tensions">Tensions</option>
+                            <option value="hostile">Hostile</option>
+                            <option value="war">War</option>
+                        </select>
+                    </label>
+                    
+                    <button id="add-relation-btn" class="btn">Add/Update Relation</button>
+                    
+                    <div>
+                        <h4>Current Relations:</h4>
+                        <div id="relation-list" class="relation-list"></div>
+                    </div>
+                </div>
+                
+                <button id="save-data-btn" class="btn">Save All Data</button>
+                <button id="load-data-btn" class="btn">Load Saved Data</button>
+                <button id="logout-btn" class="btn admin-btn">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        // This is a SHA-256 hash of the password "changeme123"
+        // Generate your own by using a tool like https://emn178.github.io/online-tools/sha256.html
+        const ADMIN_PASSWORD_HASH = "161266b4fa38e1e1cb56ce073635ca0986989a32cee7033af515270f8f960c2c";
+        const STORAGE_KEY = "diplomacy_data";
+        
+        // Application State
+        let factions = [];
+        let relations = [];
+        let currentView = "standard";
+        let isDragging = false;
+        let draggedFaction = null;
+        let dragOffset = { x: 0, y: 0 };
+
+        // DOM Elements
+        const standardView = document.getElementById("standard-view");
+        const mapView = document.getElementById("map-view");
+        const standardBtn = document.getElementById("standard-btn");
+        const mapBtn = document.getElementById("map-btn");
+        const adminBtn = document.getElementById("admin-btn");
+        const adminPanel = document.querySelector(".admin-panel");
+        const closePanel = document.querySelector(".close-panel");
+        const authForm = document.getElementById("auth-form");
+        const adminControls = document.getElementById("admin-controls");
+        const adminPassword = document.getElementById("admin-password");
+        const loginBtn = document.getElementById("login-btn");
+        const logoutBtn = document.getElementById("logout-btn");
+        const factionName = document.getElementById("faction-name");
+        const factionImage = document.getElementById("faction-image");
+        const factionColor = document.getElementById("faction-color");
+        const colorPreview = document.getElementById("color-preview");
+        const factionFont = document.getElementById("faction-font");
+        const factionDescription = document.getElementById("faction-description");
+        const addFactionBtn = document.getElementById("add-faction-btn");
+        const factionSelect = document.getElementById("faction-select");
+        const relationTarget = document.getElementById("relation-target");
+        const relationType = document.getElementById("relation-type");
+        const addRelationBtn = document.getElementById("add-relation-btn");
+        const relationList = document.getElementById("relation-list");
+        const saveDataBtn = document.getElementById("save-data-btn");
+        const loadDataBtn = document.getElementById("load-data-btn");
+
+        // Initialize Application
+        function initApp() {
+            // Event Listeners
+            standardBtn.addEventListener("click", () => switchView("standard"));
+            mapBtn.addEventListener("click", () => switchView("map"));
+            adminBtn.addEventListener("click", toggleAdminPanel);
+            closePanel.addEventListener("click", toggleAdminPanel);
+            loginBtn.addEventListener("click", login);
+            logoutBtn.addEventListener("click", logout);
+            addFactionBtn.addEventListener("click", addFaction);
+            factionSelect.addEventListener("change", updateRelationTargets);
+            factionSelect.addEventListener("change", displayCurrentRelations);
+            addRelationBtn.addEventListener("click", addRelation);
+            saveDataBtn.addEventListener("click", saveData);
+            loadDataBtn.addEventListener("click", loadData);
+            factionColor.addEventListener("input", updateColorPreview);
+            
+            // Initial setup
+            loadInitialData();
+            updateColorPreview();
+            renderViews();
+        }
+
+        // View Switching
+        function switchView(view) {
+            currentView = view;
+            
+            if (view === "standard") {
+                standardBtn.classList.add("active");
+                mapBtn.classList.remove("active");
+                standardView.style.opacity = "1";
+                standardView.style.pointerEvents = "auto";
+                mapView.style.opacity = "0";
+                mapView.style.pointerEvents = "none";
+            } else {
+                standardBtn.classList.remove("active");
+                mapBtn.classList.add("active");
+                standardView.style.opacity = "0";
+                standardView.style.pointerEvents = "none";
+                mapView.style.opacity = "1";
+                mapView.style.pointerEvents = "auto";
+            }
+            
+            renderViews();
+        }
+
+        // Admin Panel
+        function toggleAdminPanel() {
+            adminPanel.classList.toggle("open");
+        }
+
+        // Simple hash function for password checking
+        async function sha256(message) {
+            // encode as UTF-8
+            const msgBuffer = new TextEncoder().encode(message);                    
+            // hash the message
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            // convert ArrayBuffer to Array
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            // convert bytes to hex string
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+        
+        async function login() {
+            const inputHash = await sha256(adminPassword.value);
+            if (inputHash === ADMIN_PASSWORD_HASH) {
+                authForm.style.display = "none";
+                adminControls.style.display = "block";
+                updateFactionSelect();
+                updateRelationTargets();
+                displayCurrentRelations();
+            } else {
+                alert("Incorrect password!");
+            }
+        }
+
+        function logout() {
+            authForm.style.display = "flex";
+            adminControls.style.display = "none";
+            adminPassword.value = "";
+        }
+
+        // Color Preview
+        function updateColorPreview() {
+            const color = factionColor.value || "#FFFFFF";
+            colorPreview.style.backgroundColor = color;
+        }
+
+        // Faction Management
+        function addFaction() {
+            const name = factionName.value.trim();
+            const image = factionImage.value.trim();
+            const color = factionColor.value.trim() || "#FFFFFF";
+            const font = factionFont.value;
+            const description = factionDescription.value.trim();
+            
+            if (!name || !image) {
+                alert("Faction name and image URL are required!");
+                return;
+            }
+            
+            // Create a new faction
+            const newFaction = {
+                id: Date.now().toString(),
+                name,
+                image,
+                color,
+                font,
+                description,
+                position: { x: 100, y: 100 } // Default position for map view
+            };
+            
+            factions.push(newFaction);
+            
+            // Clear form
+            factionName.value = "";
+            factionImage.value = "";
+            factionColor.value = "";
+            factionDescription.value = "";
+            
+            // Update UI
+            updateFactionSelect();
+            renderViews();
+        }
+
+        function updateFactionSelect() {
+            // Update faction dropdown in admin panel
+            factionSelect.innerHTML = "";
+            relationTarget.innerHTML = "";
+            
+            factions.forEach(faction => {
+                const option = document.createElement("option");
+                option.value = faction.id;
+                option.textContent = faction.name;
+                factionSelect.appendChild(option);
+                
+                const targetOption = option.cloneNode(true);
+                relationTarget.appendChild(targetOption);
+            });
+            
+            displayCurrentRelations();
+        }
+
+        function updateRelationTargets() {
+            const selectedFactionId = factionSelect.value;
+            
+            // Clear and rebuild relation target dropdown
+            relationTarget.innerHTML = "";
+            
+            factions.forEach(faction => {
+                // Don't allow setting relations with self
+                if (faction.id !== selectedFactionId) {
+                    const option = document.createElement("option");
+                    option.value = faction.id;
+                    option.textContent = faction.name;
+                    relationTarget.appendChild(option);
+                }
+            });
+        }
+
+        // Relation Management
+        function addRelation() {
+            const factionId = factionSelect.value;
+            const targetId = relationTarget.value;
+            const type = relationType.value;
+            
+            if (!factionId || !targetId) {
+                alert("You must select both factions!");
+                return;
+            }
+            
+            // Check if relation already exists
+            const existingRelationIndex = relations.findIndex(
+                r => (r.factionId === factionId && r.targetId === targetId) ||
+                     (r.factionId === targetId && r.targetId === factionId)
+            );
+            
+            if (existingRelationIndex !== -1) {
+                // Update existing relation
+                relations[existingRelationIndex] = {
+                    factionId,
+                    targetId,
+                    type
+                };
+            } else {
+                // Add new relation
+                relations.push({
+                    factionId,
+                    targetId,
+                    type
+                });
+            }
+            
+            // Update UI
+            displayCurrentRelations();
+            renderViews();
+        }
+
+        function displayCurrentRelations() {
+            const selectedFactionId = factionSelect.value;
+            
+            if (!selectedFactionId) {
+                relationList.innerHTML = "<p>Select a faction to view its relations</p>";
+                return;
+            }
+            
+            // Filter relations for selected faction
+            const factionRelations = relations.filter(
+                r => r.factionId === selectedFactionId || r.targetId === selectedFactionId
+            );
+            
+            if (factionRelations.length === 0) {
+                relationList.innerHTML = "<p>No relations defined for this faction</p>";
+                return;
+            }
+            
+            // Build relation list
+            relationList.innerHTML = "";
+            
+            factionRelations.forEach(relation => {
+                const otherFactionId = relation.factionId === selectedFactionId 
+                    ? relation.targetId 
+                    : relation.factionId;
+                
+                const otherFaction = factions.find(f => f.id === otherFactionId);
+                
+                if (!otherFaction) return;
+                
+                const relationDiv = document.createElement("div");
+                relationDiv.classList.add("relation", `relation-${relation.type}`);
+                
+                relationDiv.innerHTML = `
+                    <div class="relation-indicator"></div>
+                    <div class="relation-target">${otherFaction.name}</div>
+                    <div class="relation-status">${formatRelationType(relation.type)}</div>
+                `;
+                
+                relationList.appendChild(relationDiv);
+            });
+        }
+
+        function formatRelationType(type) {
+            const types = {
+                merged: "Merged",
+                allied: "Allied",
+                friendly: "Friendly",
+                trade: "Trade Agreement",
+                nonaggression: "Non-Aggression Pact",
+                neutral: "Neutral",
+                tensions: "Tensions",
+                hostile: "Hostile",
+                war: "War"
+            };
+            
+            return types[type] || type;
+        }
+
+        // Data Management
+        function saveData() {
+            const data = {
+                factions,
+                relations
+            };
+            
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            alert("Data saved successfully!");
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    factions = data.factions || [];
+                    relations = data.relations || [];
+                    
+                    updateFactionSelect();
+                    renderViews();
+                    alert("Data loaded successfully!");
+                } catch (error) {
+                    alert("Error loading data: " + error.message);
+                }
+            } else {
+                alert("No saved data found!");
+            }
+        }
+
+        function loadInitialData() {
+            // Try to load data from localStorage on startup
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    factions = data.factions || [];
+                    relations = data.relations || [];
+                    updateFactionSelect();
+                } catch (error) {
+                    console.error("Error loading initial data:", error);
+                }
+            }
+        }
+
+        // Rendering
+        function renderViews() {
+            renderStandardView();
+            renderMapView();
+        }
+
+        function renderStandardView() {
+            standardView.innerHTML = "";
+            
+            factions.forEach(faction => {
+                const factionElement = createFactionElement(faction);
+                standardView.appendChild(factionElement);
+                
+                // Make draggable for admin
+                if (adminControls.style.display === "block") {
+                    makeElementDraggable(factionElement, faction);
+                }
+            });
+        }
+
+        function createFactionElement(faction) {
+            const factionDiv = document.createElement("div");
+            factionDiv.className = "faction";
+            factionDiv.dataset.id = faction.id;
+            
+            const logo = document.createElement("img");
+            logo.src = faction.image;
+            logo.alt = faction.name;
+            logo.className = "faction-logo";
+            
+            const nameDiv = document.createElement("div");
+            nameDiv.className = "faction-name";
+            nameDiv.textContent = faction.name;
+            nameDiv.style.color = faction.color;
+            nameDiv.style.fontFamily = faction.font;
+            
+            const detailsDiv = document.createElement("div");
+            detailsDiv.className = "faction-details";
+            
+            const description = document.createElement("p");
+            description.textContent = faction.description;
+            
+            const relationsTitleDiv = document.createElement("div");
+            relationsTitleDiv.textContent = "Relations:";
+            relationsTitleDiv.style.fontWeight = "bold";
+            relationsTitleDiv.style.marginTop = "1rem";
+            
+            detailsDiv.appendChild(description);
+            detailsDiv.appendChild(relationsTitleDiv);
+            
+            // Add relations
+            const factionRelations = relations.filter(
+                r => r.factionId === faction.id || r.targetId === faction.id
+            );
+            
+            if (factionRelations.length === 0) {
+                const noRelations = document.createElement("p");
+                noRelations.textContent = "No relations defined";
+                noRelations.style.fontStyle = "italic";
+                detailsDiv.appendChild(noRelations);
+            } else {
+                factionRelations.forEach(relation => {
+                    if (relation.type === "neutral") return; // Skip neutral relations
+                    
+                    const otherFactionId = relation.factionId === faction.id 
+                        ? relation.targetId 
+                        : relation.factionId;
+                    
+                    const otherFaction = factions.find(f => f.id === otherFactionId);
+                    
+                    if (!otherFaction) return;
+                    
+                    const relationDiv = document.createElement("div");
+                    relationDiv.className = `relation relation-${relation.type}`;
+                    
+                    relationDiv.innerHTML = `
+                        <div class="relation-indicator"></div>
+                        <div class="relation-target">${otherFaction.name}</div>
+                        <div class="relation-status">${formatRelationType(relation.type)}</div>
+                    `;
+                    
+                    detailsDiv.appendChild(relationDiv);
+                });
+            }
+            
+            factionDiv.appendChild(logo);
+            factionDiv.appendChild(nameDiv);
+            factionDiv.appendChild(detailsDiv);
+            
+            // Toggle details on click
+            factionDiv.addEventListener("click", function(e) {
+                // Don't toggle if admin is dragging
+                if (isDragging) return;
+                
+                const expanded = factionDiv.classList.contains("expanded");
+                
+                // Close all expanded factions
+                document.querySelectorAll(".faction.expanded").forEach(f => {
+                    f.classList.remove("expanded");
+                });
+                
+                // Toggle current faction
+                if (!expanded) {
+                    factionDiv.classList.add("expanded");
+                }
+            });
+            
+            return factionDiv;
+        }
+
+        function renderMapView() {
+            mapView.innerHTML = "";
+            
+            // Create faction nodes
+            factions.forEach(faction => {
+                const factionNode = document.createElement("div");
+                factionNode.className = "faction-map";
+                factionNode.dataset.id = faction.id;
+                factionNode.style.left = `${faction.position.x}px`;
+                factionNode.style.top = `${faction.position.y}px`;
+                
+                const logo = document.createElement("img");
+                logo.src = faction.image;
+                logo.alt = faction.name;
+                logo.className = "faction-logo";
+                
+                const nameDiv = document.createElement("div");
+                nameDiv.className = "faction-name";
+                nameDiv.textContent = faction.name;
+                nameDiv.style.color = faction.color;
+                nameDiv.style.fontFamily = faction.font;
+                
+                factionNode.appendChild(logo);
+                factionNode.appendChild(nameDiv);
+                mapView.appendChild(factionNode);
+                
+                // Make draggable for admin
+                if (adminControls.style.display === "block") {
+                    makeElementDraggable(factionNode, faction);
+                }
+                
+                // Toggle details on click
+                factionNode.addEventListener("click", function(e) {
+                    if (isDragging) return;
+                    
+                    // Create a clone of the standard view faction details
+                    const standardFaction = document.querySelector(`.faction[data-id="${faction.id}"]`);
+                    if (standardFaction) {
+                        const expanded = factionNode.classList.contains("expanded");
+                        
+                        // Close all expanded factions
+                        document.querySelectorAll(".faction-map.expanded").forEach(f => {
+                            f.classList.remove("expanded");
+                        });
+                        
+                        // Toggle current faction
+                        if (!expanded) {
+                            factionNode.classList.add("expanded");
+                            
+                            // Clone details if not already present
+                            if (!factionNode.querySelector(".faction-details")) {
+                                const detailsClone = standardFaction.querySelector(".faction-details").cloneNode(true);
+                                factionNode.appendChild(detailsClone);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Draw relation lines
+            relations.forEach(relation => {
+                if (relation.type === "neutral") return; // Skip neutral relations
+                
+                const sourceFaction = factions.find(f => f.id === relation.factionId);
+                const targetFaction = factions.find(f => f.id === relation.targetId);
+                
+                if (!sourceFaction || !targetFaction) return;
+                
+                // Get positions
+                const sourceNode = document.querySelector(`.faction-map[data-id="${sourceFaction.id}"]`);
+                const targetNode = document.querySelector(`.faction-map[data-id="${targetFaction.id}"]`);
+                
+                if (!sourceNode || !targetNode) return;
+                
+                // Calculate center points
+                const sourceRect = sourceNode.getBoundingClientRect();
+                const targetRect = targetNode.getBoundingClientRect();
+                const mapRect = mapView.getBoundingClientRect();
+                
+                const sourceX = sourceFaction.position.x + 30; // Half of logo width
+                const sourceY = sourceFaction.position.y + 30;
+                const targetX = targetFaction.position.x + 30;
+                const targetY = targetFaction.position.y + 30;
+                
+                // Calculate line length and angle
+                const dx = targetX - sourceX;
+                const dy = targetY - sourceY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                
+                // Create line
+                const line = document.createElement("div");
+                line.className = `relation-line relation-${relation.type}`;
+                line.style.width = `${length}px`;
+                line.style.left = `${sourceX}px`;
+                line.style.top = `${sourceY}px`;
+                line.style.transform = `rotate(${angle}deg)`;
+                
+                // Set line color based on relation type
+                const colors = {
+                    merged: "var(--merged-color)",
+                    allied: "var(--allied-color)",
+                    friendly: "var(--friendly-color)",
+                    trade: "var(--trade-color)",
+                    nonaggression: "var(--nonaggression-color)",
+                    tensions: "var(--tensions-color)",
+                    hostile: "var(--hostile-color)",
+                    war: "var(--war-color)"
+                };
+                
+                line.style.backgroundColor = colors[relation.type] || "#666";
+                
+                mapView.appendChild(line);
+            });
+        }
+
+        // Dragging functionality
+        function makeElementDraggable(element, faction) {
+            element.style.cursor = "grab";
+            
+            element.addEventListener("mousedown", startDrag);
+            element.addEventListener("touchstart", startDrag);
+            
+            function startDrag(e) {
+                e.preventDefault();
+                
+                // Set active element
+                isDragging = true;
+                draggedFaction = faction;
+                
+                const isMapView = element.classList.contains("faction-map");
+                
+                // Calculate offset
+                if (e.type === "mousedown") {
+                    dragOffset.x = e.clientX - (isMapView ? parseInt(element.style.left) : 0);
+                    dragOffset.y = e.clientY - (isMapView ? parseInt(element.style.top) : 0);
+                } else {
+                    const touch = e.touches[0];
+                    dragOffset.x = touch.clientX - (isMapView ? parseInt(element.style.left) : 0);
+                    dragOffset.y = touch.clientY - (isMapView ? parseInt(element.style.top) : 0);
+                }
+                
+                element.style.cursor = "grabbing";
+                
+                // Add move and end event listeners
+                document.addEventListener("mousemove", drag);
+                document.addEventListener("touchmove", drag);
+                document.addEventListener("mouseup", endDrag);
+                document.addEventListener("touchend", endDrag);
+            }
+            
+            function drag(e) {
+                if (!isDragging) return;
+                
+                e.preventDefault();
+                
+                let clientX, clientY;
+                
+                if (e.type === "mousemove") {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                } else {
+                    const touch = e.touches[0];
+                    clientX = touch.clientX;
+                    clientY = touch.clientY;
+                }
+                
+                const isMapView = element.classList.contains("faction-map");
+                
+                if (isMapView) {
+                    // Update position for map view
+                    const x = clientX - dragOffset.x;
+                    const y = clientY - dragOffset.y;
+                    
+                    element.style.left = `${x}px`;
+                    element.style.top = `${y}px`;
+                    
+                    // Update faction position in data
+                    draggedFaction.position.x = x;
+                    draggedFaction.position.y = y;
+                    
+                    // Redraw relation lines
+                    renderMapView();
+                } else {
+                    // For standard view, just reposition the element
+                    const container = element.parentElement;
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    const x = clientX - containerRect.left - dragOffset.x;
+                    const y = clientY - containerRect.top - dragOffset.y;
+                    
+                    element.style.position = "absolute";
+                    element.style.left = `${x}px`;
+                    element.style.top = `${y}px`;
+                }
+            }
+            
+            function endDrag() {
+                isDragging = false;
+                element.style.cursor = "grab";
+                
+                document.removeEventListener("mousemove", drag);
+                document.removeEventListener("touchmove", drag);
+                document.removeEventListener("mouseup", endDrag);
+                document.removeEventListener("touchend", endDrag);
+            }
+        }
+
+        // Helper function to get relation between two factions
+        function getRelation(factionId1, factionId2) {
+            return relations.find(
+                r => (r.factionId === factionId1 && r.targetId === factionId2) ||
+                     (r.factionId === factionId2 && r.targetId === factionId1)
+            );
+        }
+
+        // Document click handler for closing expanded factions when clicking outside
+        document.addEventListener("click", function(e) {
+            if (!e.target.closest(".faction") && !e.target.closest(".faction-map")) {
+                document.querySelectorAll(".faction.expanded, .faction-map.expanded").forEach(f => {
+                    f.classList.remove("expanded");
+                });
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+</body>
+</html>
