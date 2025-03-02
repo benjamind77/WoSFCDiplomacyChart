@@ -1,4 +1,151 @@
-<!DOCTYPE html>
+// Dragging functionality
+        function makeElementDraggable(element, faction) {
+            // Only make draggable if admin is logged in
+            if (adminControls.style.display !== "block") return;
+            
+            element.style.cursor = "grab";
+            
+            element.addEventListener("mousedown", startDrag);
+            element.addEventListener("touchstart", startDrag);
+            
+            function startDrag(e) {
+                e.preventDefault();
+                
+                // Set active element
+                isDragging = true;
+                draggedFaction = faction;
+                
+                const isMapView = element.classList.contains("faction-map");
+                
+                // Get current position rather than relying on element style
+                const rect = element.getBoundingClientRect();
+                const containerRect = element.parentElement.getBoundingClientRect();
+                
+                // Calculate offset relative to the current position
+                if (e.type === "mousedown") {
+                    dragOffset.x = e.clientX - (rect.left - containerRect.left);
+                    dragOffset.y = e.clientY - (rect.top - containerRect.top);
+                } else {
+                    const touch = e.touches[0];
+                    dragOffset.x = touch.clientX - (rect.left - containerRect.left);
+                    dragOffset.y = touch.clientY - (rect.top - containerRect.top);
+                }
+                
+                element.style.cursor = "grabbing";
+                
+                // Add move and end event listeners
+                document.addEventListener("mousemove", drag);
+                document.addEventListener("touchmove", drag);
+                document.addEventListener("mouseup", endDrag);
+                document.addEventListener("touchend", endDrag);
+            }
+            
+            function drag(e) {
+                if (!isDragging) return;
+                
+                e.preventDefault();
+                
+                let clientX, clientY;
+                
+                if (e.type === "mousemove") {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                } else {
+                    const touch = e.touches[0];
+                    clientX = touch.clientX;
+                    clientY = touch.clientY;
+                }
+                
+                const isMapView = element.classList.contains("faction-map");
+                
+                if (isMapView) {
+                    // Update position for map view with grid snapping
+                    const container = element.parentElement;
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    // Calculate raw position
+                    let x = clientX - containerRect.left - dragOffset.x;
+                    let y = clientY - containerRect.top - dragOffset.y;
+                    
+                    // Snap to grid
+                    x = Math.round(x / GRID_SIZE) * GRID_SIZE;
+                    y = Math.round(y / GRID_SIZE) * GRID_SIZE;
+                    
+                    // Check for collisions with other factions
+                    const thisRect = {
+                        x: x,
+                        y: y,
+                        width: 60,
+                        height: 60
+                    };
+                    
+                    let hasCollision = false;
+                    
+                    document.querySelectorAll('.faction-map').forEach(otherElement => {
+                        if (otherElement === element) return;
+                        
+                        const otherFaction = factions.find(f => f.id === otherElement.dataset.id);
+                        if (!otherFaction) return;
+                        
+                        const otherRect = {
+                            x: otherFaction.position.x,
+                            y: otherFaction.position.y,
+                            width: 60,
+                            height: 60
+                        };
+                        
+                        if (rectsIntersect(thisRect, otherRect)) {
+                            hasCollision = true;
+                        }
+                    });
+                    
+                    if (!hasCollision) {
+                        // Apply the new position
+                        element.style.left = `${x}px`;
+                        element.style.top = `${y}px`;
+                        
+                        // Update faction position in data
+                        draggedFaction.position.x = x;
+                        draggedFaction.position.y = y;
+                    }
+                    
+                    // Redraw relation lines
+                    renderMapView();
+                } else {
+                    // For standard view, just reposition the element to its grid cell
+                    const container = element.parentElement;
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    let x = (Math.round((clientX - containerRect.left) / GRID_SIZE) * GRID_SIZE) - dragOffset.x;
+                    let y = (Math.round((clientY - containerRect.top) / GRID_SIZE) * GRID_SIZE) - dragOffset.y;
+                    
+                    element.style.position = "absolute";
+                    element.style.left = `${x}px`;
+                    element.style.top = `${y}px`;
+                }
+            }
+            
+            function endDrag() {
+                isDragging = false;
+                element.style.cursor = "grab";
+                
+                document.removeEventListener("mousemove", drag);
+                document.removeEventListener("touchmove", drag);
+                document.removeEventListener("mouseup", endDrag);
+                document.removeEventListener("touchend", endDrag);
+            }
+        }
+        
+        // Check if two rectangles intersect
+        function rectsIntersect(rect1, rect2) {
+            return !(
+                rect1.x + rect1.width < rect2.x ||
+                rect2.x + rect2.width < rect1.x ||
+                rect1.y + rect1.height < rect2.y ||
+                rect2.y + rect2.height < rect1.y
+            );
+        }
+                <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +155,11 @@
         :root {
             --primary-color: rgb(37, 39, 79);
             --secondary-color: rgb(23, 24, 48);
+            --dark-gray: #1a1a1a;
+            --medium-gray: #2d2d2d;
+            --light-gray: #444444;
             --text-color: #e0e0e0;
+            --highlight-color: #5e9eff;
             --allied-color: #00cc00;
             --friendly-color: #0066ff;
             --trade-color: #00cccc;
@@ -23,7 +174,7 @@
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: var(--secondary-color);
+            background-color: var(--dark-gray);
             color: var(--text-color);
             overflow-x: hidden;
         }
@@ -32,64 +183,74 @@
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            background: linear-gradient(to bottom, var(--dark-gray), var(--medium-gray));
         }
 
         header {
-            background-color: var(--primary-color);
+            background-color: var(--dark-gray);
             padding: 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.7);
             position: relative;
             z-index: 10;
+            border-bottom: 1px solid var(--highlight-color);
         }
 
         h1 {
             margin: 0;
             font-size: 1.8rem;
+            text-shadow: 0 0 10px rgba(94, 158, 255, 0.6);
+            letter-spacing: 1px;
         }
 
         .view-toggle {
             display: flex;
             gap: 1rem;
+            margin-right: 60px; /* Move buttons away from admin panel */
         }
 
         .btn {
-            background-color: var(--secondary-color);
+            background-color: var(--medium-gray);
             color: var(--text-color);
-            border: 1px solid #666;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+            border: 1px solid var(--highlight-color);
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
+            box-shadow: 0 0 8px rgba(94, 158, 255, 0.4);
+            font-weight: bold;
         }
 
         .btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: var(--light-gray);
+            box-shadow: 0 0 12px rgba(94, 158, 255, 0.7);
+            transform: translateY(-2px);
         }
 
         .btn.active {
-            background-color: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+            background-color: rgba(94, 158, 255, 0.2);
+            box-shadow: 0 0 15px rgba(94, 158, 255, 0.6);
         }
 
         .admin-btn {
-            background-color: #990000;
+            background-color: #6b0000;
         }
 
         .admin-panel {
             position: fixed;
             top: 0;
-            right: -400px;
-            width: 400px;
+            right: -450px;
+            width: 450px;
             height: 100vh;
-            background-color: var(--primary-color);
-            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+            background-color: var(--dark-gray);
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.8);
             transition: right 0.3s ease;
             z-index: 100;
             overflow-y: auto;
-            padding: 1rem;
+            padding: 1.5rem;
+            border-left: 1px solid var(--highlight-color);
         }
 
         .admin-panel.open {
@@ -98,41 +259,56 @@
 
         .close-panel {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 15px;
+            right: 15px;
             background: none;
             border: none;
             color: var(--text-color);
             font-size: 1.5rem;
             cursor: pointer;
+            z-index: 101;
         }
 
         .auth-form, .admin-controls {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.2rem;
         }
 
         input, select, textarea {
-            padding: 0.5rem;
-            border-radius: 4px;
-            border: 1px solid #666;
-            background-color: rgba(255, 255, 255, 0.1);
+            padding: 0.8rem;
+            border-radius: 8px;
+            border: 1px solid var(--highlight-color);
+            background-color: var(--medium-gray);
             color: var(--text-color);
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.5);
+            font-size: 1rem;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e0e0e0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            background-size: 1.2em;
+            padding-right: 2.5rem;
         }
 
         label {
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
+            font-weight: bold;
+            color: var(--highlight-color);
         }
 
         .color-preview {
-            width: 20px;
-            height: 20px;
+            width: 25px;
+            height: 25px;
             display: inline-block;
             margin-left: 10px;
-            border: 1px solid #666;
+            border: 1px solid var(--highlight-color);
+            border-radius: 4px;
         }
 
         .main-content {
@@ -151,8 +327,8 @@
         }
 
         #standard-view {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             gap: 2rem;
             padding: 2rem;
             justify-content: flex-start;
@@ -166,12 +342,42 @@
             pointer-events: none;
         }
 
+        /* Sci-fi overlay on map */
+        #map-view::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(94, 158, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(94, 158, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* Grid lines on map */
+        #map-view::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(0deg, rgba(94, 158, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(94, 158, 255, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px;
+            pointer-events: none;
+        }
+
         .faction {
             width: 150px;
             text-align: center;
             cursor: pointer;
             position: relative;
-            transition: transform 0.2s;
+            transition: transform 0.3s;
+            margin: auto;
         }
 
         .faction-logo {
@@ -179,51 +385,73 @@
             height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid var(--primary-color);
-            transition: transform 0.2s, box-shadow 0.2s;
+            border: 3px solid var(--highlight-color);
+            transition: transform 0.3s, box-shadow 0.3s;
             background-color: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 15px rgba(94, 158, 255, 0.4);
         }
 
         .faction:hover .faction-logo {
             transform: scale(1.1);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(94, 158, 255, 0.8);
         }
 
         .faction-name {
-            margin-top: 0.5rem;
+            margin-top: 0.7rem;
             font-weight: bold;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: inline-block;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
         .faction-details {
             position: absolute;
-            top: 100%;
+            top: 110%;
             left: 50%;
             transform: translateX(-50%);
-            width: 300px;
-            background-color: var(--primary-color);
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            width: 320px;
+            background-color: var(--dark-gray);
+            border-radius: 15px;
+            padding: 1.2rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(94, 158, 255, 0.4);
             z-index: 5;
             display: none;
             text-align: left;
+            border: 1px solid var(--highlight-color);
         }
 
         .faction.expanded .faction-details {
             display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
 
         .relation {
             display: flex;
             align-items: center;
-            margin: 0.5rem 0;
+            margin: 0.7rem 0;
+            padding: 8px;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            transition: background-color 0.2s;
+        }
+
+        .relation:hover {
+            background-color: rgba(94, 158, 255, 0.1);
         }
 
         .relation-indicator {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            margin-right: 8px;
+            margin-right: 10px;
+            box-shadow: 0 0 8px currentColor;
         }
 
         .relation-target {
@@ -231,21 +459,23 @@
         }
 
         /* Relations colors */
-        .relation-merged .relation-indicator { background-color: var(--merged-color); }
-        .relation-allied .relation-indicator { background-color: var(--allied-color); }
-        .relation-friendly .relation-indicator { background-color: var(--friendly-color); }
-        .relation-trade .relation-indicator { background-color: var(--trade-color); }
-        .relation-nonaggression .relation-indicator { background-color: var(--nonaggression-color); }
-        .relation-tensions .relation-indicator { background-color: var(--tensions-color); }
-        .relation-hostile .relation-indicator { background-color: var(--hostile-color); }
-        .relation-war .relation-indicator { background-color: var(--war-color); }
+        .relation-merged .relation-indicator { background-color: var(--merged-color); box-shadow: 0 0 8px var(--merged-color); }
+        .relation-allied .relation-indicator { background-color: var(--allied-color); box-shadow: 0 0 8px var(--allied-color); }
+        .relation-friendly .relation-indicator { background-color: var(--friendly-color); box-shadow: 0 0 8px var(--friendly-color); }
+        .relation-trade .relation-indicator { background-color: var(--trade-color); box-shadow: 0 0 8px var(--trade-color); }
+        .relation-nonaggression .relation-indicator { background-color: var(--nonaggression-color); box-shadow: 0 0 8px var(--nonaggression-color); }
+        .relation-tensions .relation-indicator { background-color: var(--tensions-color); box-shadow: 0 0 8px var(--tensions-color); }
+        .relation-hostile .relation-indicator { background-color: var(--hostile-color); box-shadow: 0 0 8px var(--hostile-color); }
+        .relation-war .relation-indicator { background-color: var(--war-color); box-shadow: 0 0 8px var(--war-color); }
 
         /* Map view lines */
         .relation-line {
             position: absolute;
-            height: 2px;
+            height: 3px;
             transform-origin: 0 0;
             z-index: 1;
+            box-shadow: 0 0 10px currentColor;
+            border-radius: 3px;
         }
 
         .faction-map {
@@ -263,24 +493,58 @@
         .faction-map .faction-name {
             font-size: 0.8rem;
             background-color: rgba(0, 0, 0, 0.7);
-            padding: 2px 5px;
-            border-radius: 3px;
+            padding: 3px 8px;
+            border-radius: 10px;
         }
 
         /* Relation Management */
         .relation-mgmt {
-            margin-top: 1rem;
-            border-top: 1px solid #666;
-            padding-top: 1rem;
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--highlight-color);
+            padding-top: 1.5rem;
         }
 
         .relation-list {
             max-height: 300px;
             overflow-y: auto;
             margin: 1rem 0;
-            border: 1px solid #666;
+            border: 1px solid var(--highlight-color);
+            border-radius: 8px;
+            padding: 0.8rem;
+            background-color: var(--medium-gray);
+        }
+
+        /* Sci-fi elements */
+        h2, h3, h4 {
+            color: var(--highlight-color);
+            position: relative;
+            padding-left: 15px;
+        }
+
+        h2::before, h3::before, h4::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 70%;
+            background-color: var(--highlight-color);
             border-radius: 4px;
-            padding: 0.5rem;
+        }
+
+        /* Grid overlay for snapping */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            pointer-events: none;
+            z-index: 0;
         }
 
         /* Mobile responsiveness */
@@ -300,7 +564,11 @@
             }
             
             .faction-details {
-                width: 250px;
+                width: 280px;
+            }
+            
+            .view-toggle {
+                margin-right: 0;
             }
         }
     </style>
@@ -318,7 +586,9 @@
 
         <div class="main-content">
             <div id="standard-view"></div>
-            <div id="map-view"></div>
+            <div id="map-view">
+                <div class="grid-overlay"></div>
+            </div>
         </div>
 
         <div class="admin-panel">
@@ -422,11 +692,10 @@
 
     <script>
         // Configuration
-        // This is a SHA-256 hash of the password "changeme123"
-        // Generate your own by using a tool like https://emn178.github.io/online-tools/sha256.html
+        // This is a SHA-256 hash of the password that was provided
         const ADMIN_PASSWORD_HASH = "161266b4fa38e1e1cb56ce073635ca0986989a32cee7033af515270f8f960c2c";
         const STORAGE_KEY = "diplomacy_data";
-        
+        const GRID_SIZE = 80; // Size of grid cells for snapping in pixels
         // Application State
         let factions = [];
         let relations = [];
@@ -1102,9 +1371,102 @@
                 });
             }
         });
+        
+        // Add some sci-fi animation effects
+        function addScifiEffects() {
+            // Pulse animation for faction logos in map view
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes pulse {
+                    0% { box-shadow: 0 0 15px rgba(94, 158, 255, 0.4); }
+                    50% { box-shadow: 0 0 25px rgba(94, 158, 255, 0.7); }
+                    100% { box-shadow: 0 0 15px rgba(94, 158, 255, 0.4); }
+                }
+                
+                .faction-map .faction-logo {
+                    animation: pulse 3s infinite ease-in-out;
+                }
+                
+                /* Different timing for each faction to create variety */
+                .faction-map:nth-child(2n) .faction-logo {
+                    animation-delay: 0.5s;
+                }
+                
+                .faction-map:nth-child(3n) .faction-logo {
+                    animation-delay: 1s;
+                }
+                
+                .faction-map:nth-child(4n) .faction-logo {
+                    animation-delay: 1.5s;
+                }
+                
+                /* Glow effect on hover */
+                .btn:hover {
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+                }
+                
+                /* Scan line effect for map view */
+                @keyframes scanlines {
+                    0% { background-position: 0 0; }
+                    100% { background-position: 0 100%; }
+                }
+                
+                #map-view::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-image: 
+                        linear-gradient(to bottom, 
+                            transparent 50%, 
+                            rgba(94, 158, 255, 0.03) 50%, 
+                            rgba(94, 158, 255, 0.03) 51%, 
+                            transparent 51%);
+                    background-size: 100% 4px;
+                    pointer-events: none;
+                    z-index: 10;
+                    animation: scanlines 10s linear infinite;
+                }
+                
+                /* Space dust particles */
+                @keyframes float {
+                    0% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.2; }
+                    50% { transform: translateY(-20px) translateX(10px) rotate(5deg); opacity: 0.6; }
+                    100% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.2; }
+                }
+                
+                .space-dust {
+                    position: absolute;
+                    width: 2px;
+                    height: 2px;
+                    background-color: rgba(255, 255, 255, 0.5);
+                    border-radius: 50%;
+                    box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+                    pointer-events: none;
+                    animation: float 8s infinite ease-in-out;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // Add space dust particles to map view
+            for (let i = 0; i < 50; i++) {
+                const dust = document.createElement('div');
+                dust.className = 'space-dust';
+                dust.style.left = `${Math.random() * 100}%`;
+                dust.style.top = `${Math.random() * 100}%`;
+                dust.style.animationDelay = `${Math.random() * 8}s`;
+                dust.style.animationDuration = `${8 + Math.random() * 7}s`;
+                mapView.appendChild(dust);
+            }
+        }
 
         // Initialize the application
-        document.addEventListener("DOMContentLoaded", initApp);
+        document.addEventListener("DOMContentLoaded", function() {
+            initApp();
+            addScifiEffects();
+        });
     </script>
 </body>
 </html>
